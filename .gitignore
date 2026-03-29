@@ -1,0 +1,13 @@
+# ── SECRET FILES — DO NOT COMMIT ──────────────────────────────
+# These files contain API keys and webhook URLs.
+# Use env.example.js as a reference to create your own env.js.
+env.js
+.env
+
+# ── NODE ───────────────────────────────────────────────────────
+node_modules/
+dist/
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

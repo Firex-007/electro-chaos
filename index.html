@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electro-Chaos: Quantum Odyssey</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="src/styles/style.css">
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="danger-overlay"></div>
+    <div id="intro-bubbles"></div>
+
+    <div id="hud">
+        <div id="energy-wrap">
+            <div id="energy-label">Quantum Coherence</div>
+            <div id="energy-container">
+                <div id="energy-fill"></div>
+            </div>
+        </div>
+        <div id="score-display">SCORE 0</div>
+        <div id="shell-stats">
+            <div id="shell-n">n=1</div>
+            <div id="shell-name">INNER CORE</div>
+            <div id="shell-zeff">PULL: 9.70 Zeff</div>
+        </div>
+        <div id="enemy-count">⚡ 0 HOSTILE ELECTRONS</div>
+        <div id="boost-hint">SPACE: Dash | Q: Wave | E: Shield | F: Supernova Blast </div>
+        <div id="mode-indicator">
+            <div id="mode-particle" class="mode-box active" onclick="setMode('particle')">PARTICLE (P)</div>
+            <span class="mode-sep">|</span>
+            <div id="mode-wave" class="mode-box" onclick="setMode('wave')">WAVE (Q)</div>
+            <span class="mode-sep">|</span>
+            <div id="mode-shield" class="mode-box" onclick="setMode('shield')">SHIELD (E)</div>
+        </div>
+        <div id="mute-toggle" class="mode-box" style="position:absolute; bottom:32px; left:30px;"
+            onclick="toggleMuteHUD()">🔊 AUDIO: ON</div>
+    </div>
+
+    <div id="toast" style="opacity:0"></div>
+
+    <!-- START -->
+    <div id="start-screen" class="overlay" style="display:none">
+        <div class="ov-eye">A Quantum Escape</div>
+        <h1 style="color:var(--cyan);text-shadow:0 0 40px rgba(0,240,255,0.5)">ELECTRO-CHAOS</h1>
+        <div class="ov-sub">Quantum Odyssey</div>
+        <div class="ov-body">
+            You are an <span class="hl">Electron</span> trapped in the deepest orbital shell.<br>
+            Hostile electrons <span class="hr">patrol the field</span> — same charge means <span class="hr">violent
+                repulsion</span>.<br>
+            Get too close and you'll be <span class="hr">blasted away</span>, draining your Coherence fast.<br><br>
+            <strong style="color:var(--yellow)">Push outward. Escape all 4 shells. Don't get cornered.</strong><br><br>
+            <div class="keys-grid">
+                <div class="key-item"><span>WASD</span></div>
+                <div class="key-item">Move & Accelerate</div>
+                <div class="key-item"><span>SPACE</span></div>
+                <div class="key-item">Photon Kick (boost)</div>
+                <div class="key-item"><span>Q</span></div>
+                <div class="key-item">Wave Mode — ghost past fields</div>
+                <div class="key-item"><span>E</span></div>
+                <div class="key-item">Rest State — shield & regen</div>
+                <div class="key-item"><span>F</span></div>
+                <div class="key-item">Supernova (>65% Coherence)</div>
+            </div>
+        </div>
+        <div style="display:flex; gap:15px; justify-content:center">
+            <button id="activate-audio-btn" class="btn" onclick="activateAudio()">🔊 ACTIVATE ACOUSTICS</button>
+            <button class="btn" style="background:var(--cyan); color:#000" onclick="startGame()">Begin Odyssey</button>
+        </div>
+    </div>
+
+    <!-- PAUSE -->
+    <div id="pause-screen" class="overlay">
+        <div class="ov-eye">Simulation Paused</div>
+        <h1>STASIS</h1>
+        <div class="pause-options">
+            <button class="btn" onclick="togglePause()">Resume (Space)</button>
+            <button class="btn btn-alt" onclick="location.reload()">Reboot Core</button>
+            <button class="btn btn-alt" onclick="exitGame()">Exit to Surface</button>
+        </div>
+        <div id="pause-mute" class="ov-sub" style="margin-top:25px; cursor:pointer" onclick="toggleMuteHUD()">AUDIO: ON
+        </div>
+    </div>
+
+    <!-- DEATH -->
+    <div id="death-screen" class="overlay">
+        <div class="ov-eye">Quantum State Collapsed</div>
+        <h1>DECOHERENCE</h1>
+        <div class="ov-sub">Shell n=<span id="death-shell">1</span> &nbsp;·&nbsp; <span id="death-time">0.0</span>s
+            &nbsp;·&nbsp; Score <span id="death-score">0</span> &nbsp;·&nbsp; Peak Speed <span
+                id="death-speed">0</span>% c</div>
+        <div class="ov-body" id="death-reason">Your coherence collapsed.</div>
+
+        <!-- Featherless AI Generative Readout -->
+        <div id="pm-box" class="post-mortem-box">
+            <div class="pm-header">[AI TELEMETRY POST-MORTEM]</div>
+            <div id="pm-text" class="pm-body"></div>
+        </div>
+
+        <button class="btn" onclick="location.reload()">Re-Materialize</button>
+    </div>
+
+    <!-- ESCAPE -->
+    <div id="escape-screen" class="overlay">
+        <div class="ov-eye">Ionization Complete</div>
+        <h1>IONIZED</h1>
+        <div class="ov-sub">Escaped to Quantum Infinity &nbsp;·&nbsp; Score <span id="escape-score">0</span></div>
+        <button class="btn" onclick="location.reload()">Repeat Odyssey</button>
+    </div>
+
+    <script src="env.js"></script>
+    <script src="src/audioManager.js"></script>
+    <script src="src/js/game.js"></script>
+</body>
+
+</html>
