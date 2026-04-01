@@ -220,7 +220,7 @@ function triggerDeath(reason) {
 }
 
 async function sendN8nTelemetry(event) {
-    const url = window.ENV ? window.ENV.N8N_WEBHOOK_URL : '';
+    const url = import.meta.env.VITE_N8N_WEBHOOK_URL || '';
     if (!url) {
         console.warn('n8n Webhook URL missing. Telemetry not sent.');
         return;
@@ -254,7 +254,7 @@ async function generatePostMortem(stats) {
 
     el.innerHTML = '<span class="blink">Quantum link syncing with Gemini 3 Flash... Analyzing wave collapse...</span>';
 
-    const url = window.ENV ? window.ENV.N8N_WEBHOOK_URL : '';
+    const url = import.meta.env.VITE_N8N_WEBHOOK_URL || '';
     if (!url) {
         el.innerHTML = '<span style="color:var(--yellow)">[SYSTEM] n8n URL missing. Oracle signal lost.</span>';
         return;
@@ -1534,6 +1534,15 @@ function introLoop() {
     if (gameState === 'intro') { updateIntro(dt); drawIntro(); requestAnimationFrame(introLoop); }
     else { draw(); }
 }
+
+// Expose functions to window for HTML onclick compatibility
+window.setMode = setMode;
+window.toggleMuteHUD = toggleMuteHUD;
+window.activateAudio = activateAudio;
+window.startGame = startGame;
+window.togglePause = togglePause;
+window.exitGame = exitGame;
+window.skipIntro = skipIntro;
 
 gameState = 'intro';
 lastTime = performance.now();

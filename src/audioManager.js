@@ -1,7 +1,7 @@
 const AUDIO_TRACKS = [
-    { name: "Inner Core", filepath: "public/assets/track1-core.mp3" },
-    { name: "Circuit Lattice", filepath: "public/assets/track2-lattice.mp3" },
-    { name: "Quantum Infinity", filepath: "public/assets/track3-infinity.mp3" }
+    { name: "Inner Core", filepath: "/assets/track1-core.mp3" },
+    { name: "Circuit Lattice", filepath: "/assets/track2-lattice.mp3" },
+    { name: "Quantum Infinity", filepath: "/assets/track3-infinity.mp3" }
 ];
 
 const MASTER_VOLUME = 0.45;
@@ -26,7 +26,7 @@ class AudioManager {
             const audioObj = new Audio();
             audioObj.loop = true;
             audioObj.volume = 0; // Start silenced
-            
+
             // Expert Fix 1 & 2: Absolute Root Path + Kebab Case
             const fullPath = trackInfo.filepath;
 
@@ -56,7 +56,7 @@ class AudioManager {
 
         const firstTrack = this.tracks[0];
         firstTrack.element.volume = MASTER_VOLUME;
-        
+
         // Expert Fix 3: Direct playback attempt, no async delays
         console.log(`Now Playing 🎵: [${firstTrack.info.name}] (Source: ${firstTrack.fullPath})`);
         firstTrack.element.play().then(() => {
