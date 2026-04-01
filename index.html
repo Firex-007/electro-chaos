@@ -113,12 +113,19 @@
         <button class="btn" onclick="location.reload()">Re-Materialize</button>
     </div>
 
-    <!-- ESCAPE -->
-    <div id="escape-screen" class="overlay">
-        <div class="ov-eye">Ionization Complete</div>
-        <h1>IONIZED</h1>
-        <div class="ov-sub">Escaped to Quantum Infinity &nbsp;·&nbsp; Score <span id="escape-score">0</span></div>
-        <button class="btn" onclick="location.reload()">Repeat Odyssey</button>
+    <!-- ESCAPE / VICTORY -->
+    <div id="escape-screen" class="overlay" style="display:none">
+        <div class="ov-eye" style="color:var(--cyan)">⚡ Quantum Ionization Complete ⚡</div>
+        <h1 style="font-size:64px; background: linear-gradient(90deg,#00f0ff,#bc13fe); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">ESCAPED</h1>
+        <div class="ov-sub" style="font-size:16px; line-height:2">
+            Score &nbsp;<strong id="escape-score" style="color:var(--yellow)">0</strong>
+            &nbsp;·&nbsp; Time &nbsp;<strong id="escape-time" style="color:var(--cyan)">0.0</strong>s
+            &nbsp;·&nbsp; Peak Velocity &nbsp;<strong id="escape-speed" style="color:#bc13fe">0</strong> km/h
+        </div>
+        <div class="ov-body" style="color:rgba(255,255,255,0.6); max-width:480px; margin:0 auto 20px">
+            You defied the Coulomb barrier. 4 orbital shells. One electron. No mercy.<br>The nucleus never stood a chance.
+        </div>
+        <button class="btn" onclick="location.reload()">▶ REPEAT ODYSSEY</button>
     </div>
 
     <script type="module" src="/src/audioManager.js"></script>

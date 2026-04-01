@@ -49,10 +49,11 @@ let score = 0;
 let lastTime = performance.now();
 let shakeX = 0, shakeY = 0, shakeMag = 0;
 let dangerLevel = 0;
-let boostCooldown = 0;    // legacy, used for UI display, keeping for teleport cooldown integration
-let teleportCooldown = 0; // time before next Zap
-let breakthroughTimer = 0;  // how long player has hovered at the shell boundary
-let overheatFlash = 0;   // red flash when boost is on cooldown
+let boostCooldown = 0;
+let teleportCooldown = 0;
+let breakthroughTimer = 0;
+let overheatFlash = 0;
+// isEscaping and escapeTimer declared below with triggerEscape()
 
 // ── TELEMETRY ──────────────────────────────────────────────────────────────
 let telemetry = {
@@ -221,25 +222,20 @@ function togglePause() {
 }
 
 function triggerDeath(reason) {
+    if (gameState === 'dead' || gameState === 'escaped') return;
     gameState = 'dead';
+    isEscaping = false;
     document.getElementById('death-shell').textContent = SHELLS[shellIdx].n;
     document.getElementById('death-time').textContent = totalTime.toFixed(1);
-    document.getElementById('death-score').textContent = score;
+    document.getElementById('death-score').textContent = Math.floor(score).toLocaleString();
     document.getElementById('death-reason').textContent = reason || 'Your energy completely depleted.';
-    document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2});
-
+    document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
     telemetry.causeOfCollapse = reason || 'Energy Depletion';
-
     document.getElementById('death-screen').style.display = 'flex';
-
-    // Trigger Deep Telemetry Analysis Post-Mortem
     sendN8nTelemetry('dead');
-    generatePostMortem({ 
-        score: score, 
-        timeAlive: totalTime, 
-        maxSpeed: telemetry.highestSpeedC 
-    });
+    generatePostMortem({ score: score, timeAlive: totalTime, maxSpeed: telemetry.highestSpeedC });
 }
+
 
 async function sendN8nTelemetry(event) {
     const url = import.meta.env.VITE_N8N_WEBHOOK_URL || '';
@@ -326,9 +322,9 @@ let isEscaping = false;
 let escapeTimer = 0;
 
 function triggerEscape() {
+    if (gameState === 'dead' || gameState === 'escaped' || isEscaping) return;
     isEscaping = true;
     escapeTimer = 0;
-    
     // Shockwave explosion clearing the screen
     spawnBurst(player.x, player.y, '#ffffff', 200);
     spawnBurst(player.x, player.y, '#00f0ff', 200);
@@ -337,6 +333,7 @@ function triggerEscape() {
     fluxFields = [];
     lattices = [];
     score += 5000;
+    showToast('<span class="hl">QUANTUM ESCAPE INITIATED — SHELL 4 BREACHED!</span>');
 }
 
 function exitGame() {
@@ -512,28 +509,27 @@ function update(dt) {
 
     if (isEscaping) {
         escapeTimer += dt;
-        player.vx *= 0.98; // drift to stop
-        player.vy *= 0.98;
-        
-        player.vx *= player.momentum;
-        player.vy *= player.momentum;
+        player.vx *= 0.99;
+        player.vy *= 0.99;
         player.x += player.vx * dt;
         player.y += player.vy * dt;
-
         camera.x += (player.x - camera.x) * 5 * dt;
         camera.y += (player.y - camera.y) * 5 * dt;
+        if (Math.random() < 0.4) spawnBurst(player.x, player.y, '#00f0ff', 2);
         
-        // Removed broken updateEntities(dt); -- entities are completely removed during escape anyway
-        
-        if (escapeTimer >= 0.3) { // 0.3s game time = 3s real time
-           isEscaping = false;
-           gameState = 'escaped';
-           if (window.audioManager) window.audioManager.transitionToShell(2);
-           document.getElementById('escape-score').textContent = Math.floor(score);
-           document.getElementById('escape-screen').style.display = 'flex';
-           sendN8nTelemetry('escaped');
+        if (escapeTimer >= 0.3) {
+            isEscaping = false;
+            gameState = 'escaped';
+            document.getElementById('escape-score').textContent = Math.floor(score).toLocaleString();
+            const etEl = document.getElementById('escape-time');
+            if (etEl) etEl.textContent = totalTime.toFixed(1);
+            const esEl = document.getElementById('escape-speed');
+            if (esEl) esEl.textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+            document.getElementById('escape-screen').style.display = 'flex';
+            if (window.audioManager) window.audioManager.transitionToShell(2);
+            sendN8nTelemetry('escaped');
         }
-        return; // skip physics logic while slow-mo escaping
+        return;
     }
 
     totalTime += dt;
@@ -877,7 +873,8 @@ function updateEntities(dt) {
 }
 
 function updateHUD() {
-    const shell = SHELLS[shellIdx];
+    if (gameState !== 'playing') return; // don't update HUD when dead/escaped
+    const shell = SHELLS[Math.min(shellIdx, SHELLS.length - 1)];
     const pct = Math.max(0, coherence);
     const fill = document.getElementById('energy-fill');
     fill.style.width = pct + '%';
@@ -1369,25 +1366,26 @@ function draw() {
 
     // ── HUD OVERLAYS (screen space) ────────────────────────────────────────
     const playerDist = Math.hypot(player.x, player.y);
-    const distPct = Math.max(0, Math.min(1, playerDist / SHELLS[shellIdx].targetR));
+    const safeShellIdx = Math.min(shellIdx, SHELLS.length - 1);
+    const distPct = Math.max(0, Math.min(1, playerDist / SHELLS[safeShellIdx].targetR));
     const screenR = Math.min(canvas.width, canvas.height) / 2 - 20;
 
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
 
-    // Radial distance arc — how far you are from the nucleus
-    ctx.strokeStyle = hexA(SHELLS[shellIdx].color, 0.13);
+    // Radial distance arc
+    ctx.strokeStyle = hexA(SHELLS[safeShellIdx].color, 0.13);
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(0, 0, screenR, -Math.PI / 2, distPct * Math.PI * 2 - Math.PI / 2);
     ctx.stroke();
 
-    // Breakthrough progress arc — glows bright as you tunnel
+    // Breakthrough progress arc
     if (breakthroughTimer > 0) {
         const btPct = breakthroughTimer / BREAKTHROUGH_REQ;
-        ctx.strokeStyle = hexA(SHELLS[shellIdx].color, 0.5 + btPct * 0.5);
+        ctx.strokeStyle = hexA(SHELLS[safeShellIdx].color, 0.5 + btPct * 0.5);
         ctx.lineWidth = 5 + btPct * 6;
-        ctx.shadowBlur = 20 * btPct; ctx.shadowColor = SHELLS[shellIdx].color;
+        ctx.shadowBlur = 20 * btPct; ctx.shadowColor = SHELLS[safeShellIdx].color;
         ctx.beginPath();
         ctx.arc(0, 0, screenR + 10, -Math.PI / 2, btPct * Math.PI * 2 - Math.PI / 2);
         ctx.stroke();
@@ -1434,17 +1432,15 @@ function gameLoop() {
     const now = performance.now();
     let dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
-    
-    if (isEscaping) dt *= 0.1; // Epic slow-mo escape
 
-    if (gameState === 'playing' || gameState === 'escaped' || gameState === 'dead') {
-        update(dt);
-    }
-    
+    // Apply time dilation ONLY during escape cinematic
+    const slowDt = isEscaping ? dt * 0.1 : dt;
+
+    update(slowDt); // always run update (death/escape states exit early after universal effects)
     draw();
-    
-    // Always request animation frame, so animations (foam, shake) persist after death
-    if (gameState !== 'paused') requestAnimationFrame(gameLoop);
+
+    // Keep loop alive in ALL states so particles/foam keep animating on overlays
+    requestAnimationFrame(gameLoop);
 }
 
 // ── INTRO CINEMATIC ────────────────────────────────────────────────────────
