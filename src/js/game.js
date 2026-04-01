@@ -225,13 +225,16 @@ function triggerDeath(reason) {
     if (gameState === 'dead' || gameState === 'escaped') return;
     gameState = 'dead';
     isEscaping = false;
+    // Stop player
+    player.vx = 0; player.vy = 0;
     document.getElementById('death-shell').textContent = SHELLS[shellIdx].n;
     document.getElementById('death-time').textContent = totalTime.toFixed(1);
     document.getElementById('death-score').textContent = Math.floor(score).toLocaleString();
     document.getElementById('death-reason').textContent = reason || 'Your energy completely depleted.';
     document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
     telemetry.causeOfCollapse = reason || 'Energy Depletion';
-    document.getElementById('death-screen').style.display = 'flex';
+    const dEl = document.getElementById('death-screen');
+    dEl.style.cssText += '; display: flex !important;';
     sendN8nTelemetry('dead');
     generatePostMortem({ score: score, timeAlive: totalTime, maxSpeed: telemetry.highestSpeedC });
 }
@@ -319,21 +322,32 @@ async function generatePostMortem(stats) {
 }
 
 let isEscaping = false;
-let escapeTimer = 0;
 
 function triggerEscape() {
-    if (gameState === 'dead' || gameState === 'escaped' || isEscaping) return;
-    isEscaping = true;
-    escapeTimer = 0;
-    // Shockwave explosion clearing the screen
+    if (gameState === 'dead' || gameState === 'escaped') return;
+    // Immediately end the game - no slow-mo timer (player flies off screen)
+    gameState = 'escaped';
+    isEscaping = false;
+    // Stop player dead in its tracks
+    player.vx = 0; player.vy = 0;
+    // Clear all hostiles
+    enemies = []; fluxFields = []; lattices = [];
+    score += 5000;
+    // Big bang
     spawnBurst(player.x, player.y, '#ffffff', 200);
     spawnBurst(player.x, player.y, '#00f0ff', 200);
     triggerShake(50);
-    enemies = [];
-    fluxFields = [];
-    lattices = [];
-    score += 5000;
-    showToast('<span class="hl">QUANTUM ESCAPE INITIATED — SHELL 4 BREACHED!</span>');
+    // Populate overlay stat fields
+    document.getElementById('escape-score').textContent = Math.floor(score).toLocaleString();
+    const etEl = document.getElementById('escape-time');
+    if (etEl) etEl.textContent = totalTime.toFixed(1);
+    const esEl = document.getElementById('escape-speed');
+    if (esEl) esEl.textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    // Show victory overlay after 1.2s so explosion particles are visible
+    setTimeout(() => {
+        document.getElementById('escape-screen').style.display = 'flex';
+    }, 1200);
+    sendN8nTelemetry('escaped');
 }
 
 function exitGame() {
