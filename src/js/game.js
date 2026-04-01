@@ -484,6 +484,30 @@ function triggerShake(mag) {
 
 // ── UPDATE ─────────────────────────────────────────────────────────────────
 function update(dt) {
+    // ── UNIVERSAL EFFECTS FOR ALL STATES ──
+    shakeMag *= 0.82;
+    shakeX = (Math.random() - 0.5) * 2 * shakeMag;
+    shakeY = (Math.random() - 0.5) * 2 * shakeMag;
+    if (overheatFlash > 0) overheatFlash -= dt;
+
+    if (totalTime % 0.1 < dt) {
+        foam.push({ x: (Math.random() - 0.5) * 3000, y: (Math.random() - 0.5) * 3000, life: Math.random() });
+        if (foam.length > 400) foam.shift();
+    }
+    foam.forEach(f => {
+        f.life += (Math.random() - 0.5) * dt * 2;
+        if (f.life < 0) f.life = 0;
+        if (f.life > 1) f.life = 1;
+    });
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
     if (gameState !== 'playing') return;
 
     if (isEscaping) {
@@ -524,13 +548,7 @@ function update(dt) {
         if (toastTimer <= 0) toastEl.style.opacity = '0';
     }
 
-    // Screenshake decay
-    shakeMag *= 0.82;
-    shakeX = (Math.random() - 0.5) * 2 * shakeMag;
-    shakeY = (Math.random() - 0.5) * 2 * shakeMag;
-
-    // Overheating flash decay
-    if (overheatFlash > 0) overheatFlash -= dt;
+    // screenshake logic moved to universal updates
 
     // Boost cooldown
     if (boostCooldown > 0) boostCooldown -= dt;
@@ -899,6 +917,16 @@ function updateHUD() {
     const timerStr = `${tMin.toString().padStart(2, '0')}:${tSec.toString().padStart(2, '0')}.${tMs.toString().padStart(2, '0')}`;
     const timerEl = document.getElementById('live-timer');
     if (timerEl) timerEl.textContent = timerStr;
+
+    // Live Velocity Update
+    const spd = Math.hypot(player.vx, player.vy);
+    const spdPct = Math.min(1, spd / MAX_SPEED);
+    const kmhr = spdPct * 1079252848.8;
+    const speedEl = document.getElementById('live-speed');
+    if (speedEl) {
+        speedEl.textContent = `VELOCITY | ${kmhr.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} km/h`;
+        speedEl.style.color = spdPct > 0.85 ? '#ff003c' : spdPct > 0.55 ? '#ffe500' : '#00f0ff';
+    }
 }
 
 function mkLattice(x, y, radius, density) {
@@ -1381,21 +1409,7 @@ function draw() {
         ctx.restore();
     }
 
-    // ── Speed indicator (top-left below coherence) ─────────────────────────
-    {
-        const spd = Math.hypot(player.vx, player.vy);
-        const spdPct = spd / MAX_SPEED;
-        const kmhr = spdPct * 1079252848.8;
-        ctx.save();
-        ctx.fillStyle = 'rgba(255,255,255,0.04)';
-        ctx.fillRect(30, 68, 130, 3);
-        ctx.fillStyle = spdPct > 0.85 ? '#ff003c' : spdPct > 0.55 ? '#ffe500' : '#00f0ff';
-        ctx.fillRect(30, 68, 130 * Math.min(spdPct, 1), 3);
-        ctx.font = '8px Rajdhani, sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fillText(`VELOCITY | ${kmhr.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} km/h`, 30, 64);
-        ctx.restore();
-    }
+    // Speed indicator loop moved to HTML DOM updateHUD()
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -1414,9 +1428,14 @@ function gameLoop() {
     
     if (isEscaping) dt *= 0.1; // Epic slow-mo escape
 
-    update(dt);
+    if (gameState === 'playing' || gameState === 'escaped' || gameState === 'dead') {
+        update(dt);
+    }
+    
     draw();
-    if (gameState === 'playing' || gameState === 'paused' || isEscaping) requestAnimationFrame(gameLoop);
+    
+    // Always request animation frame, so animations (foam, shake) persist after death
+    if (gameState !== 'paused') requestAnimationFrame(gameLoop);
 }
 
 // ── INTRO CINEMATIC ────────────────────────────────────────────────────────
