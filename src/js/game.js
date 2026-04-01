@@ -434,12 +434,12 @@ function triggerTeleport() {
         showToast('<span class="hr">TELEPORT RECHARGING</span>');
         return;
     }
-    if (coherence < 25) {
+    if (coherence < 15) {
         showToast('<span class="hr">INSUFFICIENT ENERGY FOR ZAP</span>');
         return;
     }
-    coherence -= 25;
-    teleportCooldown = 8.0;
+    coherence -= 15;
+    teleportCooldown = 5.0;
     
     // Determine direction based on velocity, or facing outward radially if stopped
     let spd = Math.hypot(player.vx, player.vy);
@@ -559,7 +559,7 @@ function update(dt) {
     const dist = Math.hypot(dx, dy);
 
     // Inverse Distance Stability – Slower drain at shell outer boundaries
-    let baseDrain = isWaveMode ? 5.5 : 3.0;
+    let baseDrain = isWaveMode ? 3.5 : 1.5;
     const distanceFactor = Math.min(1, dist / shell.targetR); // 0 to 1
     const drainMultiplier = shell.drainMult * Math.max(0.6, 1 - distanceFactor * 0.4); // Dropping up to 40% at the edge
     let frameDrain = baseDrain * drainMultiplier * dt;
@@ -612,7 +612,7 @@ function update(dt) {
                 const safeDist = Math.max(fDist, 1);
                 player.vx -= (fdX / safeDist) * 1200 * falloff * dt;
                 player.vy -= (fdY / safeDist) * 1200 * falloff * dt;
-                coherence -= 25 * falloff * dt; // SAP ENERGY FAST
+                coherence -= 8 * falloff * dt; // SAP ENERGY FAST
                 triggerShake(0.5 + falloff * 2);
             }
         }
@@ -642,7 +642,7 @@ function update(dt) {
 
     // ── SPEED DRIFT (Space) ──────────────────────────────────────────────────
     if (isDrifting && (ax !== 0 || ay !== 0) && !isShieldMode) {
-        coherence -= 22 * dt; // Heavy energy drain
+        coherence -= 10 * dt; // Heavy energy drain
         score += 20 * dt;
         overheatFlash = 0.5; // keeps the danger UI glowing slightly
         if (Math.random() < 0.3) spawnBurst(player.x - player.vx*0.02, player.y - player.vy*0.02, '#ffe500', 2);
@@ -886,12 +886,21 @@ function updateHUD() {
     document.getElementById('shell-n').textContent = `n=${shell.n}`;
     document.getElementById('shell-name').textContent = shell.name;
     // Show boost cooldown in zeff slot if cooling down
+    const zapEl = document.getElementById('mode-zap');
     if (teleportCooldown > 0) {
         document.getElementById('shell-zeff').textContent = `ZAP RELOAD ${teleportCooldown.toFixed(1)}s`;
         document.getElementById('shell-zeff').style.color = '#ff003c';
+        if (zapEl) {
+            zapEl.textContent = `ZAP [${teleportCooldown.toFixed(1)}s]`;
+            zapEl.style.color = '#ff003c';
+        }
     } else {
         document.getElementById('shell-zeff').textContent = `PULL: ${shell.Zeff.toFixed(2)} Zeff`;
         document.getElementById('shell-zeff').style.color = 'var(--cyan)';
+        if (zapEl) {
+            zapEl.textContent = 'ZAP RDY (LSHIFT)';
+            zapEl.style.color = '#ffe500';
+        }
     }
     document.getElementById('score-display').textContent = `SCORE ${Math.floor(score).toLocaleString()}`;
     document.getElementById('enemy-count').textContent = `⚡ ${enemies.length} HOSTILE ELECTRONS`;

@@ -36,7 +36,10 @@
             <span class="mode-sep">|</span>
             <div id="mode-wave" class="mode-box" onclick="setMode('wave')">WAVE (Q)</div>
             <span class="mode-sep">|</span>
+            <span class="mode-sep">|</span>
             <div id="mode-shield" class="mode-box" onclick="setMode('shield')">SHIELD (E)</div>
+            <span class="mode-sep">|</span>
+            <div id="mode-zap" class="mode-box" style="color:var(--yellow)">ZAP RDY (LSHIFT)</div>
         </div>
         <div id="mute-toggle" class="mode-box" style="position:absolute; bottom:32px; left:30px;"
             onclick="toggleMuteHUD()">🔊 AUDIO: ON</div>
@@ -95,7 +98,7 @@
     <!-- DEATH -->
     <div id="death-screen" class="overlay">
         <div class="ov-eye">Critical Instability</div>
-        <h1>SYSTEM FAILURE</h1>
+        <h1>FAILED ESCAPE</h1>
         <div class="ov-sub">Shell n=<span id="death-shell">1</span> &nbsp;·&nbsp; Time: <span id="death-time">0.0</span>s
             &nbsp;·&nbsp; Score <span id="death-score">0</span> &nbsp;·&nbsp; Peak <span
                 id="death-speed">0</span> km/h</div>
