@@ -443,15 +443,16 @@ function triggerTeleport() {
     let nx = 1, ny = 0;
     if (spd > 10) { nx = player.vx/spd; ny = player.vy/spd; }
     else {
-        const P = Math.atan2(player.y, player.x);
-        nx = Math.cos(P); ny = Math.sin(P);
-    }
-    
-    const jumpDist = 800;
-    spawnBurst(player.x, player.y, '#ffffff', 40); // origin zap
-    player.x += nx * jumpDist;
-    player.y += ny * jumpDist;
-    spawnBurst(player.x, player.y, '#00f0ff', 40); // dest zap
+    const P = Math.atan2(player.y, player.x);
+    nx = Math.cos(P); ny = Math.sin(P);
+}
+
+const safePdist = Math.max(Math.hypot(player.x, player.y), 1);
+const jumpDist = 800;
+spawnBurst(player.x, player.y, '#ffffff', 40); // origin zap
+player.x += (player.x / safePdist) * jumpDist;
+player.y += (player.y / safePdist) * jumpDist;
+spawnBurst(player.x, player.y, '#00f0ff', 40); // dest zap
     
     triggerShake(15);
     document.body.classList.add('glitch-warp');
@@ -565,9 +566,9 @@ function update(dt) {
         // Extra radial resistance: stronger as you approach the boundary
         const boundaryProximity = Math.min(1, dist / shell.targetR);
         const zeffScale = 1 + boundaryProximity * 0.8; // up to 1.8× pull near boundary
-        const force = (170000 * shell.Zeff * zeffScale) / (dist * dist + 800);
-        player.vx -= (dx / dist) * force * dt;
-        player.vy -= (dy / dist) * force * dt;
+        const force = (170000 * shell.Zeff * zeffScale) / Math.max(1, (dist * dist + 800));
+        player.vx -= (dx / Math.max(1, dist)) * force * dt;
+        player.vy -= (dy / Math.max(1, dist)) * force * dt;
     }
 
     // Player movement
@@ -631,7 +632,7 @@ function update(dt) {
     if (coherence <= 0) { triggerDeath('Energy level depleted — stabilization failed.'); return; }
 
     if (ax !== 0 || ay !== 0) {
-        const mag = Math.sqrt(ax * ax + ay * ay);
+        const mag = Math.max(Math.sqrt(ax * ax + ay * ay), 0.001);
         player.vx += (ax / mag) * moveSpeed * dt;
         player.vy += (ay / mag) * moveSpeed * dt;
     }
@@ -645,7 +646,7 @@ function update(dt) {
     }
 
     // ── TERMINAL VELOCITY CAP ────────────────────────────────────────────────
-    const spd = Math.hypot(player.vx, player.vy);
+    const spd = Math.max(Math.hypot(player.vx, player.vy), 0.001);
     if (spd > MAX_SPEED) {
         const limitFactor = MAX_SPEED / spd;
         player.vx *= limitFactor;
@@ -776,8 +777,8 @@ function update(dt) {
         breakthroughTimer += dt;
         // Boundary repels — acts as a spring pushing you back
         const pushBack = ((dist - shell.targetR * 0.94) / (shell.targetR * 0.06)) * 600;
-        player.vx -= (dx / dist) * pushBack * dt;
-        player.vy -= (dy / dist) * pushBack * dt;
+        player.vx -= (dx / Math.max(1, dist)) * pushBack * dt;
+        player.vy -= (dy / Math.max(1, dist)) * pushBack * dt;
     } else {
         breakthroughTimer = Math.max(0, breakthroughTimer - dt * 2); // resets if you retreat
     }
@@ -790,8 +791,8 @@ function update(dt) {
 
         // Short Snappy Teleport Forward (Tunneling mechanics bypass physical wall)
         const jumpDist = 600;
-        player.x += (dx / dist) * jumpDist;
-        player.y += (dy / dist) * jumpDist;
+        player.x += (dx / Math.max(1, dist)) * jumpDist;
+        player.y += (dy / Math.max(1, dist)) * jumpDist;
 
         // Glitch Screen Effect
         document.body.classList.add('glitch-warp');
@@ -1322,12 +1323,14 @@ function draw() {
         } else {
             // Particle mode — crisp glowing electron
             ctx.shadowBlur = 30; ctx.shadowColor = 'rgba(0,240,255,1)';
-            const pg = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, player.r);
+            const px = Number.isFinite(player.x) ? player.x : 0;
+            const py = Number.isFinite(player.y) ? player.y : 0;
+            const pg = ctx.createRadialGradient(px, py, 0, px, py, player.r);
             pg.addColorStop(0, '#fff');
             pg.addColorStop(0.5, '#80f8ff');
             pg.addColorStop(1, '#00f0ff');
             ctx.fillStyle = pg;
-            ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(px, py, player.r, 0, Math.PI * 2); ctx.fill();
 
             // Spin orbit ring
             ctx.shadowBlur = 0;
@@ -1342,12 +1345,14 @@ function draw() {
             // Drawn dense protective energy dome over the player
             ctx.shadowBlur = 20; ctx.shadowColor = '#bc13fe';
             ctx.globalAlpha = 0.6 + Math.sin(totalTime * 15) * 0.2;
-            const sg = ctx.createRadialGradient(player.x, player.y, player.r, player.x, player.y, player.r * 3.5);
+            const px = Number.isFinite(player.x) ? player.x : 0;
+            const py = Number.isFinite(player.y) ? player.y : 0;
+            const sg = ctx.createRadialGradient(px, py, player.r, px, py, player.r * 3.5);
             sg.addColorStop(0, 'rgba(188,19,254,0)');
             sg.addColorStop(0.8, 'rgba(188,19,254,0.5)');
             sg.addColorStop(1, '#bc13fe');
             ctx.fillStyle = sg;
-            ctx.beginPath(); ctx.arc(player.x, player.y, player.r * 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(px, py, player.r * 3.5, 0, Math.PI * 2); ctx.fill();
         }
 
         ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.restore();
