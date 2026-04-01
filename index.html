@@ -16,11 +16,12 @@
 
     <div id="hud">
         <div id="energy-wrap">
-            <div id="energy-label">Quantum Coherence</div>
+            <div id="energy-label">Energy Level</div>
             <div id="energy-container">
                 <div id="energy-fill"></div>
             </div>
         </div>
+        <div id="live-timer" style="position:absolute; top:24px; left:50%; transform:translateX(-50%); font-size:24px; font-weight:700; color:var(--cyan); letter-spacing:4px;">00:00.00</div>
         <div id="score-display">SCORE 0</div>
         <div id="shell-stats">
             <div id="shell-n">n=1</div>
@@ -28,7 +29,7 @@
             <div id="shell-zeff">PULL: 9.70 Zeff</div>
         </div>
         <div id="enemy-count">⚡ 0 HOSTILE ELECTRONS</div>
-        <div id="boost-hint">SPACE: Dash | Q: Wave | E: Shield | F: Supernova Blast </div>
+        <div id="boost-hint">SPACE: Speed Drift | Q: Wave Form | E: Shield Regen | SHIFT: Teleport Zap | F: Supernova </div>
         <div id="mode-indicator">
             <div id="mode-particle" class="mode-box active" onclick="setMode('particle')">PARTICLE (P)</div>
             <span class="mode-sep">|</span>
@@ -51,19 +52,24 @@
             You are an <span class="hl">Electron</span> trapped in the deepest orbital shell.<br>
             Hostile electrons <span class="hr">patrol the field</span> — same charge means <span class="hr">violent
                 repulsion</span>.<br>
-            Get too close and you'll be <span class="hr">blasted away</span>, draining your Coherence fast.<br><br>
+            Get too close and you'll be <span class="hr">blasted away</span>, draining your Energy fast.<br><br>
             <strong style="color:var(--yellow)">Push outward. Escape all 4 shells. Don't get cornered.</strong><br><br>
             <div class="keys-grid">
                 <div class="key-item"><span>WASD</span></div>
                 <div class="key-item">Move & Accelerate</div>
+            <div class="keys-grid">
+                <div class="key-item"><span>WASD</span></div>
+                <div class="key-item">Move & Accelerate</div>
                 <div class="key-item"><span>SPACE</span></div>
-                <div class="key-item">Photon Kick (boost)</div>
+                <div class="key-item">Speed Drift (Hold)</div>
+                <div class="key-item"><span>SHIFT</span></div>
+                <div class="key-item">Teleport Zap</div>
                 <div class="key-item"><span>Q</span></div>
-                <div class="key-item">Wave Mode — ghost past fields</div>
+                <div class="key-item">Wave Mode (Toggle)</div>
                 <div class="key-item"><span>E</span></div>
-                <div class="key-item">Rest State — shield & regen</div>
+                <div class="key-item">Shield Regen (Toggle)</div>
                 <div class="key-item"><span>F</span></div>
-                <div class="key-item">Supernova (>65% Coherence)</div>
+                <div class="key-item">Supernova (>65% Energy)</div>
             </div>
         </div>
         <div style="display:flex; gap:15px; justify-content:center">
@@ -87,12 +93,12 @@
 
     <!-- DEATH -->
     <div id="death-screen" class="overlay">
-        <div class="ov-eye">Quantum State Collapsed</div>
-        <h1>DECOHERENCE</h1>
-        <div class="ov-sub">Shell n=<span id="death-shell">1</span> &nbsp;·&nbsp; <span id="death-time">0.0</span>s
-            &nbsp;·&nbsp; Score <span id="death-score">0</span> &nbsp;·&nbsp; Peak Speed <span
-                id="death-speed">0</span>% c</div>
-        <div class="ov-body" id="death-reason">Your coherence collapsed.</div>
+        <div class="ov-eye">Critical Instability</div>
+        <h1>SYSTEM FAILURE</h1>
+        <div class="ov-sub">Shell n=<span id="death-shell">1</span> &nbsp;·&nbsp; Time: <span id="death-time">0.0</span>s
+            &nbsp;·&nbsp; Score <span id="death-score">0</span> &nbsp;·&nbsp; Peak <span
+                id="death-speed">0</span> km/h</div>
+        <div class="ov-body" id="death-reason">Your energy level completely depleted.</div>
 
         <!-- Featherless AI Generative Readout -->
         <div id="pm-box" class="post-mortem-box">

@@ -49,7 +49,8 @@ let score = 0;
 let lastTime = performance.now();
 let shakeX = 0, shakeY = 0, shakeMag = 0;
 let dangerLevel = 0;
-let boostCooldown = 0;    // time remaining before next photon kick allowed
+let boostCooldown = 0;    // legacy, used for UI display, keeping for teleport cooldown integration
+let teleportCooldown = 0; // time before next Zap
 let breakthroughTimer = 0;  // how long player has hovered at the shell boundary
 let overheatFlash = 0;   // red flash when boost is on cooldown
 
@@ -60,7 +61,7 @@ let telemetry = {
     highestSpeedC: 0,
     killsMitigated: 0,
     damageTaken: 0,
-    causeOfCollapse: 'Natural Decoherence'
+    causeOfCollapse: 'Energy Depletion'
 };
 
 const player = {
@@ -125,7 +126,9 @@ function spawnEnemiesForShell(idx) {
     const count = SHELLS[idx].enemies;
     enemies = [];
     for (let i = 0; i < count; i++) {
-        enemies.push(spawnEnemy(SHELLS[idx].targetR));
+        let e = spawnEnemy(SHELLS[idx].targetR);
+        if (idx === 3) { e.behavior = 'hunter'; e.r = 14 + Math.random() * 5; } // Vacuum Edge exclusively hunters
+        enemies.push(e);
     }
 }
 
@@ -136,12 +139,13 @@ function spawnFluxFieldsForShell(idx) {
     for (let i = 0; i < count; i++) {
         const a = Math.random() * Math.PI * 2;
         const r = shell.targetR * (0.3 + Math.random() * 0.5);
-        // type: 0 = magnetic (curve velocity), 1 = electric (directional push)
+        const isAnomaly = (idx === 3 && Math.random() < 0.4);
+        
         fluxFields.push({
             x: Math.cos(a) * r,
             y: Math.sin(a) * r,
-            radius: 800 + Math.random() * 1500,
-            type: Math.random() > 0.4 ? 'magnetic' : 'electric',
+            radius: isAnomaly ? 2500 : (800 + Math.random() * 1500),
+            type: isAnomaly ? 'anomaly' : (Math.random() > 0.4 ? 'magnetic' : 'electric'),
             strength: (Math.random() < 0.5 ? 1 : -1) * (150 + Math.random() * 200),
             dirX: Math.random() - 0.5,
             dirY: Math.random() - 0.5
@@ -165,9 +169,10 @@ function startGame() {
         highestSpeedC: 0,
         killsMitigated: 0,
         damageTaken: 0,
-        causeOfCollapse: 'Natural Decoherence'
+        causeOfCollapse: 'Energy Depletion'
     };
-    boostCooldown = 0; breakthroughTimer = 0; overheatFlash = 0;
+    boostCooldown = 0; teleportCooldown = 0; breakthroughTimer = 0; overheatFlash = 0;
+    isEscaping = false; escapeTimer = 0;
     enemies = []; lattices = []; photons = []; foam = []; particles = []; fluxFields = [];
     spawnEnemiesForShell(0);
     spawnFluxFieldsForShell(0);
@@ -203,10 +208,10 @@ function triggerDeath(reason) {
     document.getElementById('death-shell').textContent = SHELLS[shellIdx].n;
     document.getElementById('death-time').textContent = totalTime.toFixed(1);
     document.getElementById('death-score').textContent = score;
-    document.getElementById('death-reason').textContent = reason || 'Your wave function collapsed.';
-    document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 100).toFixed(0);
+    document.getElementById('death-reason').textContent = reason || 'Your energy completely depleted.';
+    document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2});
 
-    telemetry.causeOfCollapse = reason || 'Natural Decoherence';
+    telemetry.causeOfCollapse = reason || 'Energy Depletion';
 
     document.getElementById('death-screen').style.display = 'flex';
 
@@ -300,17 +305,21 @@ async function generatePostMortem(stats) {
     }
 }
 
+let isEscaping = false;
+let escapeTimer = 0;
+
 function triggerEscape() {
-    gameState = 'escaped';
-
-    if (window.audioManager) {
-        window.audioManager.transitionToShell(2); // Quantum Infinity Track
-    }
-
-    document.getElementById('escape-score').textContent = score;
-    document.getElementById('escape-screen').style.display = 'flex';
-
-    sendN8nTelemetry('escaped');
+    isEscaping = true;
+    escapeTimer = 0;
+    
+    // Shockwave explosion clearing the screen
+    spawnBurst(player.x, player.y, '#ffffff', 200);
+    spawnBurst(player.x, player.y, '#00f0ff', 200);
+    triggerShake(50);
+    enemies = [];
+    fluxFields = [];
+    lattices = [];
+    score += 5000;
 }
 
 function exitGame() {
@@ -354,9 +363,16 @@ function onKey(k) {
         if (k === ' ' || k === 'enter') { location.reload(); return; }
     }
     if (gameState === 'playing') {
-        if (k === 'q') setMode('wave');
+        if (k === 'q') {
+            if (isWaveMode) setMode('particle');
+            else setMode('wave');
+        }
         if (k === 'p' || k === '1') setMode('particle');
-        if (k === 'e') setMode('shield');
+        if (k === 'e') {
+            if (isShieldMode) setMode('particle');
+            else setMode('shield');
+        }
+        if (k === 'shift') triggerTeleport();
         if (k === 'f') {
             if (coherence >= 65) triggerBlast();
             else showToast('<span class="hr">INSUFFICIENT COHERENCE</span> | Supernova requires 65%');
@@ -396,6 +412,46 @@ function triggerBlast() {
     }
 }
 
+function triggerTeleport() {
+    if (teleportCooldown > 0) {
+        showToast('<span class="hr">TELEPORT RECHARGING</span>');
+        return;
+    }
+    if (coherence < 25) {
+        showToast('<span class="hr">INSUFFICIENT ENERGY FOR ZAP</span>');
+        return;
+    }
+    coherence -= 25;
+    teleportCooldown = 8.0;
+    
+    // Determine direction based on velocity, or facing outward radially if stopped
+    let spd = Math.hypot(player.vx, player.vy);
+    let nx = 1, ny = 0;
+    if (spd > 10) { nx = player.vx/spd; ny = player.vy/spd; }
+    else {
+        const P = Math.atan2(player.y, player.x);
+        nx = Math.cos(P); ny = Math.sin(P);
+    }
+    
+    const jumpDist = 800;
+    spawnBurst(player.x, player.y, '#ffffff', 40); // origin zap
+    player.x += nx * jumpDist;
+    player.y += ny * jumpDist;
+    spawnBurst(player.x, player.y, '#00f0ff', 40); // dest zap
+    
+    triggerShake(15);
+    document.body.classList.add('glitch-warp');
+    setTimeout(() => document.body.classList.remove('glitch-warp'), 100);
+    
+    // Anti-cheat: if teleport puts you outside shell, reset breakthrough
+    const dist = Math.hypot(player.x, player.y);
+    const targetR = SHELLS[shellIdx].targetR;
+    if (dist > targetR * 0.94) breakthroughTimer = 0; // cannot instantly break
+    
+    score += 150;
+    showToast('<span class="hl">QUANTUM TUNNEL EXECUTED</span>');
+}
+
 // ── TELEMETRY LOOP ─────────────────────────────────────────────────────────
 function updateTelemetry(dt) {
     if (isWaveMode) telemetry.timeInWave += dt;
@@ -412,6 +468,34 @@ function triggerShake(mag) {
 // ── UPDATE ─────────────────────────────────────────────────────────────────
 function update(dt) {
     if (gameState !== 'playing') return;
+
+    if (isEscaping) {
+        escapeTimer += dt;
+        player.vx *= 0.98; // drift to stop
+        player.vy *= 0.98;
+        
+        player.vx *= player.momentum;
+        player.vy *= player.momentum;
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+
+        camera.x += (player.x - camera.x) * 5 * dt;
+        camera.y += (player.y - camera.y) * 5 * dt;
+        
+        player.trail.push({ x: player.x, y: player.y });
+        if (player.trail.length > 50) player.trail.shift();
+        updateEntities(dt);
+        
+        if (escapeTimer >= 0.3) { // 0.3s game time = 3s real time
+           isEscaping = false;
+           gameState = 'escaped';
+           if (window.audioManager) window.audioManager.transitionToShell(2);
+           document.getElementById('escape-score').textContent = Math.floor(score);
+           document.getElementById('escape-screen').style.display = 'flex';
+           sendN8nTelemetry('escaped');
+        }
+        return; // skip physics logic while slow-mo escaping
+    }
 
     totalTime += dt;
     score += dt * 8;
@@ -435,6 +519,7 @@ function update(dt) {
 
     // Boost cooldown
     if (boostCooldown > 0) boostCooldown -= dt;
+    if (teleportCooldown > 0) teleportCooldown -= dt;
 
     const shell = SHELLS[shellIdx];
     const dx = player.x, dy = player.y;
@@ -456,8 +541,10 @@ function update(dt) {
         player.vy -= (dy / dist) * force * dt;
     }
 
-    // Player movement (no speed multiplier from space — space is a discrete kick)
-    const moveSpeed = isWaveMode ? 1100 : 1800;
+    // Player movement
+    const isDrifting = keys.has(' ');
+    let moveSpeed = isWaveMode ? 1100 : 1800;
+    if (isDrifting) moveSpeed *= 2.8; // Nitro drift multiplier
 
     let ax = 0, ay = 0;
     if (keys.has('w') || keys.has('arrowup')) ay -= 1;
@@ -487,15 +574,22 @@ function update(dt) {
                 const mag = Math.hypot(f.dirX, f.dirY);
                 player.vx += (f.dirX / mag) * Math.abs(f.strength) * 2 * falloff * dt;
                 player.vy += (f.dirY / mag) * Math.abs(f.strength) * 2 * falloff * dt;
+            } else if (f.type === 'anomaly') {
+                // Positron Anomaly - black hole drain
+                player.vx -= (fdX / fDist) * 1200 * falloff * dt;
+                player.vy -= (fdY / fDist) * 1200 * falloff * dt;
+                coherence -= 15 * falloff * dt; // SAP ENERGY FAST
+                triggerShake(0.5);
             }
         }
     });
 
     // Apply Siphon Recharge, Shield Regen, or normal inverse Drain
     if (isShieldMode) {
-        player.vx *= 0.85;
-        player.vy *= 0.85;
-        coherence = Math.min(100, coherence + 15 * dt); // Shield regen
+        player.vx *= 0.6; // Heavy braking
+        player.vy *= 0.6;
+        coherence = Math.min(100, coherence + 35 * dt); // Heavy shield regen
+        if (Math.random() < 0.2) spawnBurst(player.x, player.y, '#bc13fe', 1);
     } else if (isSiphoning) {
         coherence = Math.min(100, coherence + 10 * dt); // Neon Siphon recharge
         if (Math.random() < 0.2) spawnBurst(player.x, player.y, '#6a0dad', 2);
@@ -504,7 +598,7 @@ function update(dt) {
     }
 
     updateTelemetry(dt);
-    if (coherence <= 0) { triggerDeath('Quantum coherence at zero — decoherence into the void.'); return; }
+    if (coherence <= 0) { triggerDeath('Energy level depleted — stabilization failed.'); return; }
 
     if (ax !== 0 || ay !== 0) {
         const mag = Math.sqrt(ax * ax + ay * ay);
@@ -512,22 +606,12 @@ function update(dt) {
         player.vy += (ay / mag) * moveSpeed * dt;
     }
 
-    // ── PHOTON KICK (Space) — cooldown impulse, NOT a hold-multiplier ────────
-    if (keys.has(' ')) {
-        if (boostCooldown <= 0 && (ax !== 0 || ay !== 0)) {
-            // Instant directional burst
-            const mag = Math.sqrt(ax * ax + ay * ay);
-            player.vx += (ax / mag) * BOOST_IMPULSE;
-            player.vy += (ay / mag) * BOOST_IMPULSE;
-            coherence -= 12;   // flat cost per kick
-            boostCooldown = BOOST_COOLDOWN;
-            spawnBurst(player.x, player.y, '#ffffff', 12);
-            triggerShake(4);
-        } else if (boostCooldown > 0) {
-            // Punish holding space while on cooldown — heat builds
-            coherence -= 8 * dt;
-            overheatFlash = 0.5;
-        }
+    // ── SPEED DRIFT (Space) ──────────────────────────────────────────────────
+    if (isDrifting && (ax !== 0 || ay !== 0) && !isShieldMode) {
+        coherence -= 22 * dt; // Heavy energy drain
+        score += 20 * dt;
+        overheatFlash = 0.5; // keeps the danger UI glowing slightly
+        if (Math.random() < 0.3) spawnBurst(player.x - player.vx*0.02, player.y - player.vy*0.02, '#ffe500', 2);
     }
 
     // ── TERMINAL VELOCITY CAP ────────────────────────────────────────────────
@@ -768,9 +852,9 @@ function updateHUD() {
     document.getElementById('shell-n').textContent = `n=${shell.n}`;
     document.getElementById('shell-name').textContent = shell.name;
     // Show boost cooldown in zeff slot if cooling down
-    if (boostCooldown > 0) {
-        document.getElementById('shell-zeff').textContent = `KICK RELOAD ${boostCooldown.toFixed(1)}s`;
-        document.getElementById('shell-zeff').style.color = overheatFlash > 0 ? 'var(--red)' : 'var(--yellow)';
+    if (teleportCooldown > 0) {
+        document.getElementById('shell-zeff').textContent = `ZAP RELOAD ${teleportCooldown.toFixed(1)}s`;
+        document.getElementById('shell-zeff').style.color = '#ff003c';
     } else {
         document.getElementById('shell-zeff').textContent = `PULL: ${shell.Zeff.toFixed(2)} Zeff`;
         document.getElementById('shell-zeff').style.color = 'var(--cyan)';
@@ -780,7 +864,7 @@ function updateHUD() {
 
     // Danger vignette — also pulses red when overheating
     const dangerEl = document.getElementById('danger-overlay');
-    const overheatPulse = overheatFlash > 0 ? 0.5 + Math.sin(totalTime * 20) * 0.3 : 0;
+    const overheatPulse = keys.has(' ') ? 0.3 + Math.sin(totalTime * 20) * 0.2 : 0;
     dangerEl.style.opacity = Math.min(1, dangerLevel * 0.8 + overheatPulse).toFixed(2);
 
     // Supernova Ready Highlight
@@ -791,6 +875,14 @@ function updateHUD() {
         hintEl.style.textShadow = blastReady ? '0 0 10px var(--yellow)' : 'none';
         hintEl.style.fontWeight = blastReady ? '700' : '400';
     }
+    
+    // Live Timer Update
+    const tMin = Math.floor(totalTime / 60);
+    const tSec = Math.floor(totalTime % 60);
+    const tMs = Math.floor((totalTime % 1) * 100);
+    const timerStr = `${tMin.toString().padStart(2, '0')}:${tSec.toString().padStart(2, '0')}.${tMs.toString().padStart(2, '0')}`;
+    const timerEl = document.getElementById('live-timer');
+    if (timerEl) timerEl.textContent = timerStr;
 }
 
 function mkLattice(x, y, radius, density) {
@@ -925,7 +1017,7 @@ function draw() {
             const bRad = f.radius * 0.6;
             ctx.beginPath(); ctx.arc(f.x, f.y, bRad, totalTime, totalTime + Math.PI); ctx.stroke();
             ctx.beginPath(); ctx.arc(f.x, f.y, bRad * 0.6, -totalTime, -totalTime + Math.PI); ctx.stroke();
-        } else {
+        } else if (f.type === 'electric') {
             const color = activeSiphon ? `rgba(0, 240, 255, ${pulse})` : `rgba(0, 100, 255, ${pulse * 0.5})`; // Electric Blue/Cyan
             fg.addColorStop(0, color);
             if (activeSiphon) fg.addColorStop(0.1, `rgba(255, 255, 255, ${pulse * 0.8})`); // White hot core
@@ -943,6 +1035,21 @@ function draw() {
             ctx.moveTo(f.x - nx * f.radius / 2 + nx * lineOffset, f.y - ny * f.radius / 2 + ny * lineOffset);
             ctx.lineTo(f.x + nx * f.radius / 2 + nx * lineOffset, f.y + ny * f.radius / 2 + ny * lineOffset);
             ctx.stroke();
+        } else if (f.type === 'anomaly') {
+            const color = activeSiphon ? `rgba(255, 0, 60, ${pulse})` : `rgba(200, 0, 60, ${pulse * 0.5})`; // Blood Red
+            fg.addColorStop(0, color);
+            fg.addColorStop(0.2, '#000000');
+            fg.addColorStop(1, 'transparent');
+            ctx.fillStyle = fg;
+            ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2); ctx.fill();
+            // Draw gravity swirl
+            ctx.globalAlpha = activeSiphon ? 0.8 : 0.4;
+            ctx.strokeStyle = activeSiphon ? '#ff003c' : '#880022';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            const swirlOffset = totalTime * 2;
+            ctx.arc(f.x, f.y, f.radius * 0.4, swirlOffset, swirlOffset + Math.PI); ctx.stroke();
+            ctx.beginPath(); ctx.arc(f.x, f.y, f.radius * 0.7, -swirlOffset, -swirlOffset + Math.PI); ctx.stroke();
         }
 
         // ── FIELD NAMING LABELS ──
@@ -950,7 +1057,7 @@ function draw() {
         ctx.font = '10px Rajdhani, Segoe UI';
         ctx.fillStyle = activeSiphon ? '#ffffff' : 'rgba(255, 255, 255, 0.45)';
         ctx.textAlign = 'center';
-        const labelText = f.type === 'magnetic' ? 'UNKNOWN QUANTUM STATE - MAGNETIC FLUX' : 'UNKNOWN QUANTUM STATE - ELECTRIC GRADIENT';
+        const labelText = f.type === 'anomaly' ? 'POSITRON ANOMALY GRAVITY WELL' : (f.type === 'magnetic' ? 'UNKNOWN QUANTUM STATE - MAGNETIC FLUX' : 'UNKNOWN QUANTUM STATE - ELECTRIC GRADIENT');
         ctx.fillText(labelText, f.x, f.y - f.radius - 12);
 
         ctx.restore();
@@ -1262,6 +1369,7 @@ function draw() {
     {
         const spd = Math.hypot(player.vx, player.vy);
         const spdPct = spd / MAX_SPEED;
+        const kmhr = spdPct * 1079252848.8;
         ctx.save();
         ctx.fillStyle = 'rgba(255,255,255,0.04)';
         ctx.fillRect(30, 68, 130, 3);
@@ -1269,7 +1377,7 @@ function draw() {
         ctx.fillRect(30, 68, 130 * Math.min(spdPct, 1), 3);
         ctx.font = '8px Rajdhani, sans-serif';
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fillText(`VELOCITY | ${(spdPct * 100).toFixed(0)}% c`, 30, 64);
+        ctx.fillText(`VELOCITY | ${kmhr.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} km/h`, 30, 64);
         ctx.restore();
     }
 }
@@ -1285,11 +1393,14 @@ function hexA(hex, a) {
 // ── GAME LOOP ──────────────────────────────────────────────────────────────
 function gameLoop() {
     const now = performance.now();
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    let dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
+    
+    if (isEscaping) dt *= 0.1; // Epic slow-mo escape
+
     update(dt);
     draw();
-    if (gameState === 'playing' || gameState === 'paused') requestAnimationFrame(gameLoop);
+    if (gameState === 'playing' || gameState === 'paused' || isEscaping) requestAnimationFrame(gameLoop);
 }
 
 // ── INTRO CINEMATIC ────────────────────────────────────────────────────────
