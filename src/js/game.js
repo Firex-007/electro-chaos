@@ -125,8 +125,18 @@ function spawnEnemy(shellR) {
 function spawnEnemiesForShell(idx) {
     const count = SHELLS[idx].enemies;
     enemies = [];
+    const pAngle = (player.x === 0 && player.y === 0) ? 0 : Math.atan2(player.y, player.x);
     for (let i = 0; i < count; i++) {
+        let a = Math.random() * Math.PI * 2;
+        let r = SHELLS[idx].targetR * (0.2 + Math.random() * 0.65);
+        if (idx === 3) {
+            // Cluster Shell 4 enemies in front of the player
+            a = pAngle + (Math.random() - 0.5) * 1.5;
+            r = 25000 + Math.random() * 10000;
+        }
         let e = spawnEnemy(SHELLS[idx].targetR);
+        e.x = Math.cos(a) * r;
+        e.y = Math.sin(a) * r;
         if (idx === 3) { e.behavior = 'hunter'; e.r = 14 + Math.random() * 5; } // Vacuum Edge exclusively hunters
         enemies.push(e);
     }
@@ -137,14 +147,21 @@ function spawnFluxFieldsForShell(idx) {
     const count = idx * 2 + 1; // More fields deeper out
     const shell = SHELLS[idx];
     for (let i = 0; i < count; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const r = shell.targetR * (0.3 + Math.random() * 0.5);
+        let a = Math.random() * Math.PI * 2;
+        let r = shell.targetR * (0.3 + Math.random() * 0.5);
         const isAnomaly = (idx === 3 && Math.random() < 0.4);
         
+        if (idx === 3) {
+            // Cluster anomalies in the player's path
+            const pAngle = Math.atan2(player.y, player.x);
+            a = pAngle + (Math.random() - 0.5) * 1.0;
+            r = 26000 + Math.random() * 12000;
+        }
+
         fluxFields.push({
             x: Math.cos(a) * r,
             y: Math.sin(a) * r,
-            radius: isAnomaly ? 2500 : (800 + Math.random() * 1500),
+            radius: isAnomaly ? 3500 + Math.random()*1500 : (800 + Math.random() * 1500),
             type: isAnomaly ? 'anomaly' : (Math.random() > 0.4 ? 'magnetic' : 'electric'),
             strength: (Math.random() < 0.5 ? 1 : -1) * (150 + Math.random() * 200),
             dirX: Math.random() - 0.5,
@@ -482,9 +499,7 @@ function update(dt) {
         camera.x += (player.x - camera.x) * 5 * dt;
         camera.y += (player.y - camera.y) * 5 * dt;
         
-        player.trail.push({ x: player.x, y: player.y });
-        if (player.trail.length > 50) player.trail.shift();
-        updateEntities(dt);
+        // Removed broken updateEntities(dt); -- entities are completely removed during escape anyway
         
         if (escapeTimer >= 0.3) { // 0.3s game time = 3s real time
            isEscaping = false;
@@ -576,10 +591,11 @@ function update(dt) {
                 player.vy += (f.dirY / mag) * Math.abs(f.strength) * 2 * falloff * dt;
             } else if (f.type === 'anomaly') {
                 // Positron Anomaly - black hole drain
-                player.vx -= (fdX / fDist) * 1200 * falloff * dt;
-                player.vy -= (fdY / fDist) * 1200 * falloff * dt;
-                coherence -= 15 * falloff * dt; // SAP ENERGY FAST
-                triggerShake(0.5);
+                const safeDist = Math.max(fDist, 1);
+                player.vx -= (fdX / safeDist) * 1200 * falloff * dt;
+                player.vy -= (fdY / safeDist) * 1200 * falloff * dt;
+                coherence -= 25 * falloff * dt; // SAP ENERGY FAST
+                triggerShake(0.5 + falloff * 2);
             }
         }
     });
