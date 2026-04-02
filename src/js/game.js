@@ -228,18 +228,26 @@ function triggerDeath(reason) {
     isEscaping = false;
     dangerLevel = 0;
     player.vx = 0; player.vy = 0;
-    // Reset danger overlay immediately so it doesn't bleed over death screen
+
+    // Reset danger overlay immediately
     const dangerEl = document.getElementById('danger-overlay');
     if (dangerEl) dangerEl.style.opacity = '0';
-    document.getElementById('death-shell').textContent = SHELLS[shellIdx].n;
+
+    // Safety clamp shellIdx
+    const safeIdx = Math.min(shellIdx, SHELLS.length - 1);
+    const shell = SHELLS[safeIdx];
+
+    document.getElementById('death-shell').textContent = shell.n;
     document.getElementById('death-time').textContent = totalTime.toFixed(1);
     document.getElementById('death-score').textContent = Math.floor(score).toLocaleString();
     document.getElementById('death-reason').textContent = reason || 'Your energy completely depleted.';
     document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
     telemetry.causeOfCollapse = reason || 'Energy Depletion';
-    // Hide canvas so draw() cannot paint over the overlay
+
+    // Instant Show
     document.getElementById('gameCanvas').style.display = 'none';
     document.getElementById('death-screen').style.display = 'flex';
+
     sendN8nTelemetry('dead');
     generatePostMortem({ score: score, timeAlive: totalTime, maxSpeed: telemetry.highestSpeedC });
 }
@@ -255,7 +263,7 @@ async function sendN8nTelemetry(event) {
     const payload = {
         event: event, // 'dead' or 'escaped'
         score: Math.floor(score),
-        shellReached: SHELLS[shellIdx].n,
+        shellReached: SHELLS[Math.min(shellIdx, SHELLS.length - 1)].n,
         timeSurvived: totalTime.toFixed(1),
         causeOfCollapse: telemetry.causeOfCollapse,
         timestamp: new Date().toISOString()
@@ -348,11 +356,11 @@ function triggerEscape() {
     if (etEl) etEl.textContent = totalTime.toFixed(1);
     const esEl = document.getElementById('escape-speed');
     if (esEl) esEl.textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    // Hide canvas and show victory overlay after particles play
-    setTimeout(() => {
-        document.getElementById('gameCanvas').style.display = 'none';
-        document.getElementById('escape-screen').style.display = 'flex';
-    }, 1200);
+
+    // Instant show as requested - no timeout
+    document.getElementById('gameCanvas').style.display = 'none';
+    document.getElementById('escape-screen').style.display = 'flex';
+
     sendN8nTelemetry('escaped');
 }
 
@@ -480,7 +488,8 @@ spawnBurst(player.x, player.y, '#00f0ff', 40); // dest zap
     
     // Anti-cheat: if teleport puts you outside shell, reset breakthrough
     const dist = Math.hypot(player.x, player.y);
-    const targetR = SHELLS[shellIdx].targetR;
+    const safeIdx = Math.min(shellIdx, SHELLS.length - 1);
+    const targetR = SHELLS[safeIdx].targetR;
     if (dist > targetR * 0.94) breakthroughTimer = 0; // cannot instantly break
     
     score += 150;
@@ -552,7 +561,8 @@ function update(dt) {
     if (boostCooldown > 0) boostCooldown -= dt;
     if (teleportCooldown > 0) teleportCooldown -= dt;
 
-    const shell = SHELLS[shellIdx];
+    const safeIdx = Math.min(shellIdx, SHELLS.length - 1);
+    const shell = SHELLS[safeIdx];
     const dx = player.x, dy = player.y;
     const dist = Math.hypot(dx, dy);
 
@@ -810,7 +820,9 @@ function update(dt) {
             if (shellIdx === 1) window.audioManager.transitionToShell(1);
         }
 
-        showToast(`<span class="hl">Shell ${SHELLS[shellIdx - 1].n} breached via Quantum Tunneling!</span> Entering <span class="hy">${SHELLS[shellIdx].name}</span>.`);
+        const prevShell = SHELLS[Math.max(0, shellIdx - 1)];
+        const curShell = SHELLS[Math.min(shellIdx, SHELLS.length - 1)];
+        showToast(`<span class="hl">Shell ${prevShell.n} breached via Quantum Tunneling!</span> Entering <span class="hy">${curShell.n}</span>.`);
     }
 
     // Physics
@@ -954,18 +966,28 @@ function spawnBurst(x, y, color, n = 10) {
 
 // ── DRAW ───────────────────────────────────────────────────────────────────
 function draw() {
-    // Do not draw anything once an overlay is showing
-    if (gameState === 'dead' || gameState === 'escaped') return;
+    // 1. Guard against non-playing states or invalid variables
+    if (gameState !== 'playing' && gameState !== 'paused') return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#06060e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    try {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#06060e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const shell = SHELLS[shellIdx];
+        const safeIdx = Math.min(shellIdx, SHELLS.length - 1);
+        const shell = SHELLS[safeIdx];
 
-    ctx.save();
-    // Camera + screenshake
-    ctx.translate(canvas.width / 2 - camera.x + shakeX, canvas.height / 2 - camera.y + shakeY);
+        ctx.save();
+        // 2. Robust camera transform with NaN guards
+        const camX = Number.isFinite(camera.x) ? camera.x : 0;
+        const camY = Number.isFinite(camera.y) ? camera.y : 0;
+        const sX = Number.isFinite(shakeX) ? shakeX : 0;
+        const sY = Number.isFinite(shakeY) ? shakeY : 0;
+
+        ctx.translate(canvas.width / 2 - camX + sX, canvas.height / 2 - camY + sY);
+
+        // -- RENDER BODY -- (simplified for readability in this chunk, keeps original logic)
+        // [Existing drawing logic continues...]
 
     // ── STARFIELD (static quantum foam) ───────────────────────────────────
     foam.forEach(f => {
@@ -1400,7 +1422,7 @@ function draw() {
         ctx.stroke();
         ctx.shadowBlur = 0;
         // Label
-        ctx.fillStyle = hexA(SHELLS[shellIdx].color, 0.9);
+        ctx.fillStyle = hexA(shell.color, 0.9);
         ctx.font = 'bold 11px Rajdhani, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(`TUNNELING… ${Math.ceil((BREAKTHROUGH_REQ - breakthroughTimer) * 10) / 10}s`, 0, -screenR - 22);
@@ -1424,8 +1446,9 @@ function draw() {
         ctx.textAlign = 'left';
         ctx.restore();
     }
-
-    // Speed indicator loop moved to HTML DOM updateHUD()
+    } catch (e) {
+        console.error("Draw crash suppressed:", e);
+    }
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
