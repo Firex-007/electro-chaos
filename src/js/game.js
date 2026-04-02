@@ -328,6 +328,7 @@ function triggerEscape() {
     if (gameState === 'dead' || gameState === 'escaped') return;
     gameState = 'escaped';
     isEscaping = false;
+    shellIdx = SHELLS.length - 1; // clamp back to valid index (was 4, SHELLS only has 0-3)
     player.vx = 0; player.vy = 0;
     enemies = []; fluxFields = []; lattices = [];
     score += 5000;
