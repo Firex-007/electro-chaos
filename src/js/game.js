@@ -943,6 +943,9 @@ function spawnBurst(x, y, color, n = 10) {
 
 // ── DRAW ───────────────────────────────────────────────────────────────────
 function draw() {
+    // Do not draw anything once an overlay is showing
+    if (gameState === 'dead' || gameState === 'escaped') return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#06060e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
