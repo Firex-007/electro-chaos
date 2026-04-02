@@ -225,7 +225,6 @@ function triggerDeath(reason) {
     if (gameState === 'dead' || gameState === 'escaped') return;
     gameState = 'dead';
     isEscaping = false;
-    // Stop player
     player.vx = 0; player.vy = 0;
     document.getElementById('death-shell').textContent = SHELLS[shellIdx].n;
     document.getElementById('death-time').textContent = totalTime.toFixed(1);
@@ -233,8 +232,9 @@ function triggerDeath(reason) {
     document.getElementById('death-reason').textContent = reason || 'Your energy completely depleted.';
     document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
     telemetry.causeOfCollapse = reason || 'Energy Depletion';
-    const dEl = document.getElementById('death-screen');
-    dEl.style.cssText += '; display: flex !important;';
+    // CRITICAL: hide canvas so draw() frame can't paint over the overlay
+    document.getElementById('gameCanvas').style.display = 'none';
+    document.getElementById('death-screen').style.display = 'flex';
     sendN8nTelemetry('dead');
     generatePostMortem({ score: score, timeAlive: totalTime, maxSpeed: telemetry.highestSpeedC });
 }
@@ -325,26 +325,23 @@ let isEscaping = false;
 
 function triggerEscape() {
     if (gameState === 'dead' || gameState === 'escaped') return;
-    // Immediately end the game - no slow-mo timer (player flies off screen)
     gameState = 'escaped';
     isEscaping = false;
-    // Stop player dead in its tracks
     player.vx = 0; player.vy = 0;
-    // Clear all hostiles
     enemies = []; fluxFields = []; lattices = [];
     score += 5000;
-    // Big bang
     spawnBurst(player.x, player.y, '#ffffff', 200);
     spawnBurst(player.x, player.y, '#00f0ff', 200);
     triggerShake(50);
-    // Populate overlay stat fields
     document.getElementById('escape-score').textContent = Math.floor(score).toLocaleString();
     const etEl = document.getElementById('escape-time');
     if (etEl) etEl.textContent = totalTime.toFixed(1);
     const esEl = document.getElementById('escape-speed');
     if (esEl) esEl.textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    // Show victory overlay after 1.2s so explosion particles are visible
+    // CRITICAL: hide canvas so draw() can't paint over the overlay
+    // Small delay so the explosion particles render for 1 frame first
     setTimeout(() => {
+        document.getElementById('gameCanvas').style.display = 'none';
         document.getElementById('escape-screen').style.display = 'flex';
     }, 1200);
     sendN8nTelemetry('escaped');
@@ -1455,11 +1452,13 @@ function gameLoop() {
     // Apply time dilation ONLY during escape cinematic
     const slowDt = isEscaping ? dt * 0.1 : dt;
 
-    update(slowDt); // always run update (death/escape states exit early after universal effects)
+    update(slowDt);
     draw();
 
-    // Keep loop alive in ALL states so particles/foam keep animating on overlays
-    requestAnimationFrame(gameLoop);
+    // Stop loop when game has ended — canvas hidden, overlay is showing
+    if (gameState !== 'dead' && gameState !== 'escaped') {
+        requestAnimationFrame(gameLoop);
+    }
 }
 
 // ── INTRO CINEMATIC ────────────────────────────────────────────────────────
