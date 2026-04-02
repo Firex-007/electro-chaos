@@ -226,14 +226,18 @@ function triggerDeath(reason) {
     if (gameState === 'dead' || gameState === 'escaped') return;
     gameState = 'dead';
     isEscaping = false;
+    dangerLevel = 0;
     player.vx = 0; player.vy = 0;
+    // Reset danger overlay immediately so it doesn't bleed over death screen
+    const dangerEl = document.getElementById('danger-overlay');
+    if (dangerEl) dangerEl.style.opacity = '0';
     document.getElementById('death-shell').textContent = SHELLS[shellIdx].n;
     document.getElementById('death-time').textContent = totalTime.toFixed(1);
     document.getElementById('death-score').textContent = Math.floor(score).toLocaleString();
     document.getElementById('death-reason').textContent = reason || 'Your energy completely depleted.';
     document.getElementById('death-speed').textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
     telemetry.causeOfCollapse = reason || 'Energy Depletion';
-    // CRITICAL: hide canvas so draw() frame can't paint over the overlay
+    // Hide canvas so draw() cannot paint over the overlay
     document.getElementById('gameCanvas').style.display = 'none';
     document.getElementById('death-screen').style.display = 'flex';
     sendN8nTelemetry('dead');
@@ -328,10 +332,14 @@ function triggerEscape() {
     if (gameState === 'dead' || gameState === 'escaped') return;
     gameState = 'escaped';
     isEscaping = false;
-    shellIdx = SHELLS.length - 1; // clamp back to valid index (was 4, SHELLS only has 0-3)
+    shellIdx = SHELLS.length - 1; // clamp back to valid index
+    dangerLevel = 0;
     player.vx = 0; player.vy = 0;
     enemies = []; fluxFields = []; lattices = [];
     score += 5000;
+    // Reset danger overlay
+    const dangerEl = document.getElementById('danger-overlay');
+    if (dangerEl) dangerEl.style.opacity = '0';
     spawnBurst(player.x, player.y, '#ffffff', 200);
     spawnBurst(player.x, player.y, '#00f0ff', 200);
     triggerShake(50);
@@ -340,8 +348,7 @@ function triggerEscape() {
     if (etEl) etEl.textContent = totalTime.toFixed(1);
     const esEl = document.getElementById('escape-speed');
     if (esEl) esEl.textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    // CRITICAL: hide canvas so draw() can't paint over the overlay
-    // Small delay so the explosion particles render for 1 frame first
+    // Hide canvas and show victory overlay after particles play
     setTimeout(() => {
         document.getElementById('gameCanvas').style.display = 'none';
         document.getElementById('escape-screen').style.display = 'flex';
@@ -519,7 +526,11 @@ function update(dt) {
         if (p.life <= 0) particles.splice(i, 1);
     }
 
-    if (gameState !== 'playing') return;
+    if (gameState !== 'playing') {
+        // Zero out danger level so vignette clears when game ends
+        dangerLevel = 0;
+        return;
+    }
 
     // isEscaping block removed — triggerEscape() now shows overlay directly
 
