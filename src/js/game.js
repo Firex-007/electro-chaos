@@ -53,7 +53,8 @@ let boostCooldown = 0;
 let teleportCooldown = 0;
 let breakthroughTimer = 0;
 let overheatFlash = 0;
-// isEscaping and escapeTimer declared below with triggerEscape()
+let isEscaping = false; // set true only briefly during old code — kept for safety
+let escapeTimer = 0;
 
 // ── TELEMETRY ──────────────────────────────────────────────────────────────
 let telemetry = {
@@ -190,7 +191,7 @@ function startGame() {
         causeOfCollapse: 'Energy Depletion'
     };
     boostCooldown = 0; teleportCooldown = 0; breakthroughTimer = 0; overheatFlash = 0;
-    isEscaping = false; escapeTimer = 0;
+    isEscaping = false; escapeTimer = 0; // legacy reset
     enemies = []; lattices = []; photons = []; foam = []; particles = []; fluxFields = [];
     spawnEnemiesForShell(0);
     spawnFluxFieldsForShell(0);
@@ -321,7 +322,7 @@ async function generatePostMortem(stats) {
     }
 }
 
-let isEscaping = false;
+
 
 function triggerEscape() {
     if (gameState === 'dead' || gameState === 'escaped') return;
@@ -519,30 +520,7 @@ function update(dt) {
 
     if (gameState !== 'playing') return;
 
-    if (isEscaping) {
-        escapeTimer += dt;
-        player.vx *= 0.99;
-        player.vy *= 0.99;
-        player.x += player.vx * dt;
-        player.y += player.vy * dt;
-        camera.x += (player.x - camera.x) * 5 * dt;
-        camera.y += (player.y - camera.y) * 5 * dt;
-        if (Math.random() < 0.4) spawnBurst(player.x, player.y, '#00f0ff', 2);
-        
-        if (escapeTimer >= 0.3) {
-            isEscaping = false;
-            gameState = 'escaped';
-            document.getElementById('escape-score').textContent = Math.floor(score).toLocaleString();
-            const etEl = document.getElementById('escape-time');
-            if (etEl) etEl.textContent = totalTime.toFixed(1);
-            const esEl = document.getElementById('escape-speed');
-            if (esEl) esEl.textContent = (telemetry.highestSpeedC * 1079252848.8).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
-            document.getElementById('escape-screen').style.display = 'flex';
-            if (window.audioManager) window.audioManager.transitionToShell(2);
-            sendN8nTelemetry('escaped');
-        }
-        return;
-    }
+    // isEscaping block removed — triggerEscape() now shows overlay directly
 
     totalTime += dt;
     score += dt * 8;
